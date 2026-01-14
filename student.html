@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Y-FIND | Browse Items</title>
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #00441B, #0B6B3A);
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1400px;
+    margin: auto;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    overflow: hidden;
+}
+
+header {
+    background: linear-gradient(135deg, #00441B, #0B6B3A);
+    color: white;
+    padding: 30px;
+    text-align: center;
+}
+
+h1 { font-size: 2.5em; }
+.subtitle { opacity: 0.9; }
+
+.content { padding: 30px; }
+
+.filter-bar {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.filter-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+label { font-weight: 600; margin-bottom: 6px; display: block; }
+
+select {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 2px solid #e0e0e0;
+}
+
+.items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.item-card {
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.item-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.item-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 8px;
+    background: #f8f9fa;
+    margin-bottom: 10px;
+}
+
+/* ===== MODAL ===== */
+#itemModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-box {
+    background: white;
+    max-width: 90vw;
+    max-height: 90vh;
+    width: auto;
+    border-radius: 15px;
+    padding: 20px;
+    overflow-y: auto;
+    position: relative;
+    animation: zoomIn 0.2s ease;
+}
+
+/* FULL IMAGE – AUTO ADJUST */
+.modal-box img {
+    width: 100%;
+    height: auto;
+    max-height: 70vh;
+    object-fit: contain;
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+
+.close-btn {
+    position: sticky;
+    top: 0;
+    float: right;
+    font-size: 26px;
+    border: none;
+    background: none;
+    cursor: pointer;
+}
+
+@keyframes zoomIn {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<header>
+    <h1>Y-FIND 🔍</h1>
+    <p class="subtitle">School Lost & Found System</p>
+</header>
+
+<div class="content">
+<h2>Browse Lost & Found Items</h2>
+<p style="color:#666;margin-bottom:20px;">
+Click an item to view the full image and details.
+</p>
+
+<div class="filter-bar">
+    <div class="filter-row">
+        <div>
+            <label>Type</label>
+            <select id="filter-type" onchange="loadItems()">
+                <option value="">All</option>
+                <option value="lost">Lost</option>
+                <option value="found">Found</option>
+            </select>
+        </div>
+
+        <div>
+            <label>Category</label>
+            <select id="filter-category" onchange="loadItems()">
+                <option value="">All</option>
+                <option>Electronics</option>
+                <option>Clothing</option>
+                <option>Books</option>
+                <option>Keys</option>
+                <option>Bags</option>
+                <option>Accessories</option>
+                <option>Documents</option>
+                <option>Other</option>
+            </select>
+        </div>
+
+        <div>
+            <label>Status</label>
+            <select id="filter-status" onchange="loadItems()">
+                <option value="">All</option>
+                <option value="pending">Pending</option>
+                <option value="returned">Returned</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div id="items-container" class="items-grid"></div>
+</div>
+</div>
+
+<!-- MODAL -->
+<div id="itemModal" onclick="closeModal(event)">
+    <div class="modal-box">
+        <button class="close-btn" onclick="closeModal()">✖</button>
+        <img id="modalImage">
+        <h2 id="modalTitle"></h2>
+        <p id="modalDescription"></p>
+        <p><strong>Category:</strong> <span id="modalCategory"></span></p>
+        <p><strong>Location:</strong> <span id="modalLocation"></span></p>
+        <p><strong>Date:</strong> <span id="modalDate"></span></p>
+        <p><strong>Contact:</strong> <span id="modalEmail"></span></p>
+    </div>
+</div>
+
+<script>
+const API_URL = 'http://localhost/lost_found/api.php';
+
+document.addEventListener('DOMContentLoaded', loadItems);
+
+async function loadItems() {
+    const type = val('filter-type');
+    const category = val('filter-category');
+    const status = val('filter-status');
+
+    const res = await fetch(
+        `${API_URL}?request=items&type=${type}&category=${category}&status=${status}`
+    );
+    const items = await res.json();
+    displayItems(items);
+}
+
+function val(id) {
+    return document.getElementById(id).value;
+}
+
+function displayItems(items) {
+    const c = document.getElementById('items-container');
+    if (!items.length) {
+        c.innerHTML = '<p style="color:#999;">No items found.</p>';
+        return;
+    }
+
+    c.innerHTML = items.map(item => `
+        <div class="item-card" onclick='openModal(${JSON.stringify(item)})'>
+            ${item.photo_url
+                ? `<img src="${item.photo_url}" class="item-image">`
+                : `<div class="item-image" style="display:flex;align-items:center;justify-content:center;font-size:48px;">📦</div>`}
+            <h3>${item.name}</h3>
+            <p style="color:#555;">${item.description}</p>
+        </div>
+    `).join('');
+}
+
+function openModal(item) {
+    document.getElementById('itemModal').style.display = 'flex';
+    document.getElementById('modalImage').src =
+        item.photo_url || 'https://via.placeholder.com/800?text=No+Image';
+    document.getElementById('modalTitle').textContent = item.name;
+    document.getElementById('modalDescription').textContent = item.description;
+    document.getElementById('modalCategory').textContent = item.category;
+    document.getElementById('modalLocation').textContent = item.location;
+    document.getElementById('modalDate').textContent =
+        item.type === 'lost' ? item.date_lost : item.date_found;
+    document.getElementById('modalEmail').textContent = item.contact_email;
+}
+
+function closeModal(e) {
+    if (!e || e.target.id === 'itemModal') {
+        document.getElementById('itemModal').style.display = 'none';
+    }
+}
+</script>
+
+</body>
+</html>
